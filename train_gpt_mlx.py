@@ -76,6 +76,7 @@ class Hyperparameters:
     logit_softcap: float = float(os.environ.get("LOGIT_SOFTCAP", 30.0))
     rope_base: float = float(os.environ.get("ROPE_BASE", 10000.0))
     qk_gain_init: float = float(os.environ.get("QK_GAIN_INIT", 1.5))
+    num_physical_layers: int = int(os.environ.get("NUM_PHYSICAL_LAYERS", 0))  # 0 = same as num_layers (no looping)
 
     # Optimizer. We keep the same per-group defaults as train_gpt.py.
     beta1: float = float(os.environ.get("BETA1", 0.9))
@@ -120,7 +121,7 @@ CONTROL_TENSOR_NAME_PATTERNS = tuple(
     pattern
     for pattern in os.environ.get(
         "CONTROL_TENSOR_NAME_PATTERNS",
-        "attn_scale,attn_scales,mlp_scale,mlp_scales,resid_mix,resid_mixes,q_gain,skip_weight,skip_weights",
+        "attn_scale,attn_scales,mlp_scale,mlp_scales,resid_mix,resid_mixes,q_gain,skip_weight,skip_weights,loop_scales",
     ).split(",")
     if pattern
 )
@@ -382,12 +383,18 @@ class GPT(nn.Module):
     # - tied embeddings for the LM head (the baseline default setup)
     def __init__(self, vocab_size: int, num_layers: int, dim: int, num_heads: int, num_kv_heads: int, mlp_mult: int,
                  logit_chunk_tokens: int, logit_softcap: float, rope_base: float, tied_embed_init_std: float,
-                 qk_gain_init: float):
+                 qk_gain_init: float, num_physical_layers: int = 0):
         super().__init__()
         if logit_softcap <= 0.0:
             raise ValueError(f"logit_softcap must be positive, got {logit_softcap}")
         self.logit_chunk_tokens = logit_chunk_tokens
         self.logit_softcap = logit_softcap
+
+        # Layer looping: num_physical_layers unique blocks, looped to reach num_layers effective depth
+        self.num_physical_layers = num_physical_layers if num_physical_layers > 0 else num_layers
+        assert num_layers % self.num_physical_layers == 0, \
+            f"num_layers ({num_layers}) must be divisible by num_physical_layers ({self.num_physical_layers})"
+        self.num_loop_passes = num_layers // self.num_physical_layers
 
         self.tok_emb = nn.Embedding(vocab_size, dim)
         self.num_encoder_layers = num_layers // 2
@@ -396,8 +403,11 @@ class GPT(nn.Module):
         self.skip_weights = mx.ones((self.num_skip_weights, dim), dtype=mx.float32)
         self.blocks = [
             Block(dim, num_heads, num_kv_heads, mlp_mult, rope_base, qk_gain_init)
-            for i in range(num_layers)
+            for _ in range(self.num_physical_layers)
         ]
+        # Per-loop-pass learnable scale so the model can differentiate iterations
+        if self.num_loop_passes > 1:
+            self.loop_scales = mx.ones((self.num_loop_passes, dim), dtype=mx.float32)
         self.final_norm = RMSNormNoWeight()
 
         for b in self.blocks:
@@ -415,17 +425,22 @@ class GPT(nn.Module):
         x = rms_norm(self.tok_emb(input_ids).astype(COMPUTE_DTYPE))
         x0 = x
         skips: list[mx.array] = []
+        has_loop_scales = self.num_loop_passes > 1
 
         for i in range(self.num_encoder_layers):
-            x = self.blocks[i](x, x0)
+            if has_loop_scales:
+                loop_pass = i // self.num_physical_layers
+                x = x * self.loop_scales[loop_pass].astype(x.dtype)[None, None, :]
+            x = self.blocks[i % self.num_physical_layers](x, x0)
             skips.append(x)
         for i in range(self.num_decoder_layers):
-            # Odd layer counts have one more decoder block than encoder block. The baseline only
-            # applies a skip connection when one exists, then runs the remaining decoder block(s)
-            # without an added skip.
             if skips:
                 x = x + self.skip_weights[i].astype(x.dtype)[None, None, :] * skips.pop()
-            x = self.blocks[self.num_encoder_layers + i](x, x0)
+            eff_i = self.num_encoder_layers + i
+            if has_loop_scales:
+                loop_pass = eff_i // self.num_physical_layers
+                x = x * self.loop_scales[loop_pass].astype(x.dtype)[None, None, :]
+            x = self.blocks[eff_i % self.num_physical_layers](x, x0)
         return self.final_norm(x)
 
     def loss(self, input_ids: mx.array, target_ids: mx.array) -> mx.array:
@@ -495,7 +510,7 @@ class SplitOptimizers:
         self.scalar_keys = [
             k
             for k, p in params.items()
-            if k == "skip_weights" or (k.startswith("blocks.") and (p.ndim < 2 or any(pattern in k for pattern in CONTROL_TENSOR_NAME_PATTERNS)))
+            if k in ("skip_weights", "loop_scales") or (k.startswith("blocks.") and (p.ndim < 2 or any(pattern in k for pattern in CONTROL_TENSOR_NAME_PATTERNS)))
         ]
 
         self.muon = Muon(self.matrix_keys, params, args)
@@ -885,6 +900,7 @@ def main() -> None:
         rope_base=args.rope_base,
         tied_embed_init_std=args.tied_embed_init_std,
         qk_gain_init=args.qk_gain_init,
+        num_physical_layers=args.num_physical_layers,
     )
     opt = SplitOptimizers(model, args)
 

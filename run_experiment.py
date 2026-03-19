@@ -154,6 +154,7 @@ def main():
         rope_base=args.rope_base,
         tied_embed_init_std=args.tied_embed_init_std,
         qk_gain_init=args.qk_gain_init,
+        num_physical_layers=args.num_physical_layers,
     )
     opt = SplitOptimizers(model, args)
 

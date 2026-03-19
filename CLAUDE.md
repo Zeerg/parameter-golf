@@ -36,6 +36,7 @@ Map config keys to env vars (all uppercase):
 - `warmdown_iters` → `WARMDOWN_ITERS`
 - `rope_base` → `ROPE_BASE`
 - `logit_softcap` → `LOGIT_SOFTCAP`
+- `num_physical_layers` → `NUM_PHYSICAL_LAYERS` (0 = same as num_layers, no looping)
 
 Always set (fixed, not genome parameters):
 - `DATA_PATH=/Users/tbowyer/parameter-golf/data/datasets/fineweb10B_sp1024`
@@ -114,16 +115,23 @@ Artifacts are gitignored (too large for the repo) but preserved in GitHub releas
 **IMPORTANT: Not all combinations fit in 16MB.** Always estimate params before training (see Constraints). The genome ranges below include oversized combos — you MUST reject any config where estimated params > 15.3M.
 
 Genome parameters:
-- `num_layers`: 8–11
-- `model_dim`: 384–576 (step 64)
+- `num_layers`: 8–12 (effective depth, must be divisible by `num_physical_layers` if set)
+- `num_physical_layers`: 0 (no looping) or a divisor of `num_layers` (e.g., 4, 5, 6). Keep ratio ≤ 2x (e.g., 5 physical × 2 loops, NOT 3 × 4 loops)
+- `model_dim`: 384–768 (step 64). With looping, wider dims are now feasible — use the freed param budget here
 - `num_kv_heads`: 1, 2, or 4
-- `mlp_mult`: 1–3 (but mlp_mult=3 only fits with dim≤448)
+- `mlp_mult`: 1–3 (but check size estimate — mlp_mult=3 only fits with small dim)
 - `matrix_lr`: 0.02–0.07 (log scale)
 - `tied_embed_lr`: 0.03–0.08 (log scale)
 - `scalar_lr`: 0.02–0.07 (log scale)
 - `muon_momentum`: 0.92–0.97
 - `warmup_steps`: 10–30
 - `warmdown_iters`: 800–1600
+
+Layer looping strategy — redistribute param budget, don't shrink:
+- Bad: 3 physical × 3 loops × dim 512 = 6M params (too small, weak model)
+- Good: 5 physical × 2 loops × dim 640 = ~14M params (wider representations, more effective depth)
+- Good: 6 physical × 2 loops × dim 576 = ~13M params (conservative looping, wider than baseline)
+- Size estimate with looping: use `num_physical_layers` in the formula, not `num_layers`
 
 Fixed during phase 1:
 - `num_heads` = `model_dim / 64` (keeps head_dim=64)
@@ -160,3 +168,12 @@ Add `rope_base`, `logit_softcap`, `train_seq_len` back into the genome. Run 2000
 - Quick size estimate: `params ≈ vocab_size*model_dim + num_layers*(4*model_dim² + 2*mlp_mult*model_dim² + 3*model_dim) + model_dim`. Int8 = ~1 byte/param. Add ~200KB for code/overhead. If params > 15.3M, the config won't fit.
 - Example: 11 layers, dim 576, mlp_mult 3 → ~30.7M params → ~30MB artifact → REJECTED (2x over budget)
 - Safe combos that fit 16MB: (9, 512), (10, 448), (11, 384–448), (8, 512–576 with mlp_mult≤2)
+
+## Layer Looping
+Reuse the same physical block weights multiple times to get more effective depth without more parameters. Set `NUM_PHYSICAL_LAYERS` to the number of unique blocks; `NUM_LAYERS` is the effective (total) depth. `num_layers` must be divisible by `num_physical_layers`.
+
+- Example: `NUM_LAYERS=12 NUM_PHYSICAL_LAYERS=4` → 4 unique blocks looped 3x = 12 effective layers
+- Size estimate uses `num_physical_layers` for block params (not `num_layers`)
+- A per-loop learnable scale (`loop_scales`) lets the model differentiate loop passes (tiny: `num_loop_passes * dim` params)
+- Skip connections operate over the effective layer count as before
+- `num_layers % num_physical_layers` must equal 0
