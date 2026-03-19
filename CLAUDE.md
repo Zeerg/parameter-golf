@@ -88,6 +88,12 @@ Write `result.json` to your experiment directory:
 }
 ```
 
+### 5. Train log
+`run_experiment.py` automatically tees all stdout/stderr to `train.log` in the experiment directory. Each experiment should have three files:
+- `config.json` — the genome/hyperparameters
+- `train.log` — full training output (loss curves, validation results, errors)
+- `result.json` — parsed final metrics
+
 ## Genome Search Strategy
 
 ### Phase 1 — Architecture sweep (near baseline)
