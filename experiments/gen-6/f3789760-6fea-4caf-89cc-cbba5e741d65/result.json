@@ -1,0 +1,22 @@
+{
+  "val_bpb": 2.5221959985560796,
+  "val_loss": 4.258622293065426,
+  "train_loss": 4.26190185546875,
+  "steps": 100,
+  "train_time_ms": 55061.895334,
+  "n_params": 30726808,
+  "config": {
+    "matrix_lr": 0.05923342383523872,
+    "mlp_mult": 3,
+    "model_dim": 576,
+    "muon_momentum": 0.9313499160451304,
+    "num_kv_heads": 1,
+    "num_layers": 11,
+    "scalar_lr": 0.02060202576451275,
+    "tied_embed_lr": 0.04464318430280147,
+    "warmdown_iters": 1397,
+    "warmup_steps": 14
+  },
+  "platform": "mlx_apple_m3_max",
+  "note": "Reduced batch/iterations for Mac; relative ranking valid for architecture comparison"
+}
