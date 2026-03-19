@@ -1,0 +1,12 @@
+{
+  "matrix_lr": 0.02344590609458119,
+  "mlp_mult": 1,
+  "model_dim": 406,
+  "muon_momentum": 0.9302309046206628,
+  "num_kv_heads": 2,
+  "num_layers": 8,
+  "scalar_lr": 0.06706698619650646,
+  "tied_embed_lr": 0.04183914841828414,
+  "warmdown_iters": 1534,
+  "warmup_steps": 27
+}

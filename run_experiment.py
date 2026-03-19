@@ -93,12 +93,35 @@ def eval_val_chunked(
     return val_loss, val_bpb
 
 
+class TeeStream:
+    """Write to both a stream and a log file."""
+
+    def __init__(self, stream, log_file):
+        self.stream = stream
+        self.log_file = log_file
+
+    def write(self, data):
+        self.stream.write(data)
+        self.log_file.write(data)
+        self.log_file.flush()
+
+    def flush(self):
+        self.stream.flush()
+        self.log_file.flush()
+
+
 def main():
     # Load experiment config
     exp_dir = os.environ.get("EXP_DIR")
     if not exp_dir:
         print("EXP_DIR env var required")
         sys.exit(1)
+
+    # Tee all output to train.log in the experiment directory
+    log_path = os.path.join(exp_dir, "train.log")
+    log_file = open(log_path, "w")
+    sys.stdout = TeeStream(sys.__stdout__, log_file)
+    sys.stderr = TeeStream(sys.__stderr__, log_file)
 
     config_path = os.path.join(exp_dir, "config.json")
     with open(config_path) as f:

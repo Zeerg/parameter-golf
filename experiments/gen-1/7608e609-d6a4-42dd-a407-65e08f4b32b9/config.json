@@ -1,0 +1,16 @@
+{
+  "logit_softcap": 32.74852909247571,
+  "matrix_lr": 0.012696003482442346,
+  "mlp_mult": 2,
+  "model_dim": 512,
+  "muon_momentum": 0.8738100399312468,
+  "num_heads": 4,
+  "num_kv_heads": 8,
+  "num_layers": 7,
+  "rope_base": 5662.343215214246,
+  "scalar_lr": 0.07637074554553833,
+  "tied_embed_lr": 0.18672144648101466,
+  "train_seq_len": 1024,
+  "warmdown_iters": 970,
+  "warmup_steps": 23
+}
