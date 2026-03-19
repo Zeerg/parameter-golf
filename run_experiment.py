@@ -4,8 +4,10 @@ import glob
 import json
 import math
 import os
+import pickle
 import sys
 import time
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +28,7 @@ from train_gpt_mlx import (
     TokenLoader,
     build_sentencepiece_luts,
     load_data_shard,
+    quantize_state_dict_int8,
 )
 
 
@@ -228,6 +231,23 @@ def main():
     )
     print(f"val_loss:{val_loss:.4f} val_bpb:{val_bpb:.4f}")
 
+    # Save int8-quantized artifact
+    print("Quantizing model to int8...")
+    flat_state = dict(tree_flatten(model.parameters()))
+    quant_obj, quant_stats = quantize_state_dict_int8(flat_state)
+    quant_raw = pickle.dumps(quant_obj, protocol=pickle.HIGHEST_PROTOCOL)
+    quant_compressed = zlib.compress(quant_raw, level=9)
+    artifact_path = os.path.join(exp_dir, "artifact.int8.ptz")
+    with open(artifact_path, "wb") as f:
+        f.write(quant_compressed)
+    artifact_bytes = len(quant_compressed)
+    print(f"Artifact saved: {artifact_path} ({artifact_bytes:,} bytes, {artifact_bytes/1_000_000:.2f} MB)")
+    print(f"  int8_payload: {quant_stats['int8_payload_bytes']:,} bytes, "
+          f"raw_pickle: {len(quant_raw):,} bytes, "
+          f"compressed: {artifact_bytes:,} bytes")
+    if artifact_bytes > 16_000_000:
+        print(f"WARNING: Artifact exceeds 16MB limit ({artifact_bytes:,} bytes)")
+
     # Write results
     result = {
         "val_bpb": val_bpb,
@@ -237,6 +257,7 @@ def main():
         "train_time_ms": train_time_ms,
         "n_params": n_params,
         "config": config,
+        "artifact_bytes": artifact_bytes,
         "platform": "mlx_apple_m3_max",
         "note": "Reduced batch/iterations for Mac; relative ranking valid for architecture comparison",
     }

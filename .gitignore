@@ -12,3 +12,6 @@ logs/
 .batou/
 .mcp.json
 .worktrees/
+*.int8.ptz
+*.pt
+*.npz

@@ -88,11 +88,25 @@ Write `result.json` to your experiment directory:
 }
 ```
 
-### 5. Train log
-`run_experiment.py` automatically tees all stdout/stderr to `train.log` in the experiment directory. Each experiment should have three files:
+### 5. Train log & artifact
+`run_experiment.py` automatically tees all stdout/stderr to `train.log` and saves the int8-quantized model to `artifact.int8.ptz`. Each experiment should have four files:
 - `config.json` — the genome/hyperparameters
 - `train.log` — full training output (loss curves, validation results, errors)
-- `result.json` — parsed final metrics
+- `artifact.int8.ptz` — int8-quantized + zlib-compressed model weights (gitignored)
+- `result.json` — parsed final metrics (includes `artifact_bytes` for size tracking)
+
+### 6. Tag & release after each generation
+After all experiments in a generation complete, create a git tag and GitHub release:
+```bash
+git tag gen-N
+git push origin gen-N
+gh release create gen-N --title "gen-N" --notes "Generation N results: best val_bpb=X.XXXX"
+```
+Attach the best experiment's `artifact.int8.ptz` to the release:
+```bash
+gh release upload gen-N experiments/gen-N/<best-experiment-id>/artifact.int8.ptz
+```
+Artifacts are gitignored (too large for the repo) but preserved in GitHub releases.
 
 ## Genome Search Strategy
 
