@@ -1,0 +1,8 @@
+{
+  "val_bpb": null,
+  "iterations_completed": 0,
+  "rejected": true,
+  "rejection_reason": "Estimated 18.4M params exceeds 15.3M limit. Config: 11 layers, dim=576, mlp_mult=1, kv_heads=4. Int8 artifact would be ~18.4MB, well over 16MB budget.",
+  "estimated_params": 18434880,
+  "notes": "Architecture too large. dim=576 with 11 layers doesn't fit even with mlp_mult=1. Safe combos for 11 layers: dim<=448. For dim=576: max ~8 layers with mlp_mult=1."
+}

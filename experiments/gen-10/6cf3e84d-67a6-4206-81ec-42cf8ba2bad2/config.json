@@ -1,0 +1,13 @@
+{
+  "_size_constraint": null,
+  "matrix_lr": 0.02396100099884388,
+  "mlp_mult": 1,
+  "model_dim": 576,
+  "muon_momentum": 0.9302030953587531,
+  "num_kv_heads": 4,
+  "num_layers": 11,
+  "scalar_lr": 0.0382429623413573,
+  "tied_embed_lr": 0.03133367661904163,
+  "warmdown_iters": 1098,
+  "warmup_steps": 14
+}
