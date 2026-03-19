@@ -69,6 +69,7 @@ class Hyperparameters:
     tie_embeddings = bool(int(os.environ.get("TIE_EMBEDDINGS", "1")))
     rope_base = float(os.environ.get("ROPE_BASE", 10000.0))
     logit_softcap = float(os.environ.get("LOGIT_SOFTCAP", 30.0))
+    num_physical_layers = int(os.environ.get("NUM_PHYSICAL_LAYERS", 0))  # 0 = same as num_layers (no looping)
 
     # Optimizer hyperparameters.
     embed_lr = float(os.environ.get("EMBED_LR", 0.6))
@@ -289,7 +290,7 @@ CONTROL_TENSOR_NAME_PATTERNS = tuple(
     pattern
     for pattern in os.environ.get(
         "CONTROL_TENSOR_NAME_PATTERNS",
-        "attn_scale,attn_scales,mlp_scale,mlp_scales,resid_mix,resid_mixes,q_gain,skip_weight,skip_weights",
+        "attn_scale,attn_scales,mlp_scale,mlp_scales,resid_mix,resid_mixes,q_gain,skip_weight,skip_weights,loop_scales",
     ).split(",")
     if pattern
 )
@@ -659,6 +660,7 @@ class GPT(nn.Module):
         logit_softcap: float,
         rope_base: float,
         qk_gain_init: float,
+        num_physical_layers: int = 0,
     ):
         super().__init__()
         if logit_softcap <= 0.0:
@@ -666,6 +668,13 @@ class GPT(nn.Module):
         self.tie_embeddings = tie_embeddings
         self.tied_embed_init_std = tied_embed_init_std
         self.logit_softcap = logit_softcap
+
+        # Layer looping
+        self.num_physical_layers = num_physical_layers if num_physical_layers > 0 else num_layers
+        assert num_layers % self.num_physical_layers == 0, \
+            f"num_layers ({num_layers}) must be divisible by num_physical_layers ({self.num_physical_layers})"
+        self.num_loop_passes = num_layers // self.num_physical_layers
+
         self.tok_emb = nn.Embedding(vocab_size, model_dim)
         self.num_encoder_layers = num_layers // 2
         self.num_decoder_layers = num_layers - self.num_encoder_layers
@@ -681,9 +690,13 @@ class GPT(nn.Module):
                     rope_base,
                     qk_gain_init,
                 )
-                for i in range(num_layers)
+                for _ in range(self.num_physical_layers)
             ]
         )
+        if self.num_loop_passes > 1:
+            self.loop_scales = nn.Parameter(torch.ones(self.num_loop_passes, model_dim, dtype=torch.float32))
+        else:
+            self.loop_scales = None
         self.final_norm = RMSNorm()
         self.lm_head = None if tie_embeddings else CastedLinear(model_dim, vocab_size, bias=False)
         if self.lm_head is not None:
@@ -702,15 +715,23 @@ class GPT(nn.Module):
         x = F.rms_norm(x, (x.size(-1),))
         x0 = x
         skips: list[Tensor] = []
+        has_loop_scales = self.loop_scales is not None
 
         # First half stores skips; second half reuses them in reverse order.
         for i in range(self.num_encoder_layers):
-            x = self.blocks[i](x, x0)
+            if has_loop_scales:
+                loop_pass = i // self.num_physical_layers
+                x = x * self.loop_scales[loop_pass].to(dtype=x.dtype)[None, None, :]
+            x = self.blocks[i % self.num_physical_layers](x, x0)
             skips.append(x)
         for i in range(self.num_decoder_layers):
             if skips:
                 x = x + self.skip_weights[i].to(dtype=x.dtype)[None, None, :] * skips.pop()
-            x = self.blocks[self.num_encoder_layers + i](x, x0)
+            eff_i = self.num_encoder_layers + i
+            if has_loop_scales:
+                loop_pass = eff_i // self.num_physical_layers
+                x = x * self.loop_scales[loop_pass].to(dtype=x.dtype)[None, None, :]
+            x = self.blocks[eff_i % self.num_physical_layers](x, x0)
 
         x = self.final_norm(x).reshape(-1, x.size(-1))
         targets = target_ids.reshape(-1)
@@ -835,6 +856,7 @@ def main() -> None:
         logit_softcap=args.logit_softcap,
         rope_base=args.rope_base,
         qk_gain_init=args.qk_gain_init,
+        num_physical_layers=args.num_physical_layers,
     ).to(device).bfloat16()
     for module in base_model.modules():
         if isinstance(module, CastedLinear):
@@ -861,6 +883,8 @@ def main() -> None:
     ]
     if base_model.skip_weights.numel() > 0:
         scalar_params.append(base_model.skip_weights)
+    if base_model.loop_scales is not None:
+        scalar_params.append(base_model.loop_scales)
     token_lr = args.tied_embed_lr if args.tie_embeddings else args.embed_lr
     optimizer_tok = torch.optim.Adam(
         [{"params": [base_model.tok_emb.weight], "lr": token_lr, "base_lr": token_lr}],
