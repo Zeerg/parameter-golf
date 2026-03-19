@@ -1,0 +1,8 @@
+{
+  "val_bpb": null,
+  "iterations_completed": 0,
+  "rejected": true,
+  "rejection_reason": "Estimated ~17.8M params exceeds 15.3M param limit (16MB artifact constraint). mlp_mult=3 with model_dim=512 and 8 layers produces ~17.3M layer params + 524K embedding. Safe combos require mlp_mult<=2 at dim=512.",
+  "estimated_params": 17827840,
+  "notes": "Config rejected pre-training. CLAUDE.md safe combos: (8, 512-576 with mlp_mult<=2). This config uses mlp_mult=3."
+}
