@@ -1,0 +1,6 @@
+{
+  "val_bpb": 99.0,
+  "iterations_completed": 0,
+  "notes": "Invalid genome: model_dim=406 with num_kv_heads=2 has no valid num_heads. 406 = 2 x 7 x 29; all even divisors (2, 14, 58, 406) yield odd head_dim (203, 29, 7, 1), which violates RoPE's even head_dim requirement. num_heads derived as model_dim/64=6.34 rounds to 7, but 7 is not divisible by num_kv_heads=2.",
+  "error": "ValueError: num_heads must be divisible by num_kv_heads"
+}
