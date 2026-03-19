@@ -37,6 +37,7 @@ Map config keys to env vars (all uppercase):
 - `rope_base` → `ROPE_BASE`
 - `logit_softcap` → `LOGIT_SOFTCAP`
 - `num_physical_layers` → `NUM_PHYSICAL_LAYERS` (0 = same as num_layers, no looping)
+- `quant_bits` → `QUANT_BITS` (default 8; use 7 for ~1.3MB smaller artifact at only +0.01 BPB cost)
 
 Always set (fixed, not genome parameters):
 - `DATA_PATH=/Users/tbowyer/parameter-golf/data/datasets/fineweb10B_sp1024`
@@ -190,3 +191,14 @@ Reuse the same physical block weights multiple times to get more effective depth
 - 5 phys × 2 loops × dim 576 × mlp_mult 2 = 13.9M params, 6.5MB artifact, val_bpb=2.0597, ~6GB memory
 - Memory is very comfortable with looping (~6GB vs ~12GB+ for equivalent non-looped configs)
 - dim=576 requires `num_heads=9` (576/64), so `num_kv_heads` must divide 9 (use 1, 3, or 9)
+
+## Quantization Bit Width
+Configurable via `QUANT_BITS` env var (default 8). Measured BPB cost on gen-13 (5000 steps):
+
+| Bits | val_bpb | BPB cost | Packed size | Savings vs int8 |
+|------|---------|----------|-------------|-----------------|
+| int8 | 1.6328 | baseline | 10.5MB | — |
+| int7 | 1.6430 | +0.010 | 9.2MB | 1.3MB |
+| int6 | 1.6852 | +0.052 | 7.9MB | 2.6MB |
+
+**Recommendation**: Use `QUANT_BITS=7` for submissions near the 16MB limit. The 0.01 BPB cost is recovered by fitting ~1.3M more params. int6 is steeper but may be worth it for very large models.

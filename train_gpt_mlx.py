@@ -550,10 +550,10 @@ class SplitOptimizers:
         model.update(tree_unflatten(list(updated.items())))
 
 # ==============================================================================
-# QUANTIZATION (INT8 + ZLIB)
+# QUANTIZATION (INT-N + ZLIB)
 # ==============================================================================
-# - per-row int8 for 2D float tensors
-# - per-tensor int8 for other float tensors
+# - per-row int-N for 2D float tensors (N=QUANT_BITS, default 8)
+# - per-tensor int-N for other float tensors
 # - fp16 passthrough for small float tensors
 # - exact passthrough for non-floats
 
@@ -563,6 +563,8 @@ MX_DTYPE_FROM_NAME = {
     "bfloat16": mx.bfloat16,
 }
 
+QUANT_BITS = int(os.environ.get("QUANT_BITS", 8))
+QUANT_MAXVAL = (1 << (QUANT_BITS - 1)) - 1  # e.g., 127 for int8, 63 for int7
 INT8_KEEP_FLOAT_MAX_NUMEL = 65_536
 INT8_KEEP_FLOAT_STORE_DTYPE = np.float16
 INT8_PER_ROW_SCALE_DTYPE = np.float16
@@ -585,19 +587,20 @@ def keep_float_array(name: str, arr: mx.array, passthrough_orig_dtypes: dict[str
 
 def quantize_float_array(arr: mx.array) -> tuple[np.ndarray, np.ndarray]:
     f32 = _np_float32(arr)
+    qmax = float(QUANT_MAXVAL)
     if f32.ndim == 2:
         # Matrices get one scale per row, which usually tracks output-channel
         # ranges much better than a single tensor-wide scale.
         clip_abs = np.quantile(np.abs(f32), INT8_CLIP_Q, axis=1) if f32.size else np.empty((f32.shape[0],), dtype=np.float32)
         clipped = np.clip(f32, -clip_abs[:, None], clip_abs[:, None])
-        scale = np.maximum(clip_abs / 127.0, 1.0 / 127.0).astype(np.float32, copy=False)
-        q = np.clip(np.round(clipped / scale[:, None]), -127, 127).astype(np.int8, copy=False)
+        scale = np.maximum(clip_abs / qmax, 1.0 / qmax).astype(np.float32, copy=False)
+        q = np.clip(np.round(clipped / scale[:, None]), -qmax, qmax).astype(np.int8, copy=False)
         return np.ascontiguousarray(q), np.ascontiguousarray(scale.astype(INT8_PER_ROW_SCALE_DTYPE, copy=False))
 
     # Vectors / scalars use a simpler per-tensor scale.
     clip_abs = float(np.quantile(np.abs(f32).reshape(-1), INT8_CLIP_Q)) if f32.size else 0.0
-    scale = np.array(clip_abs / 127.0 if clip_abs > 0.0 else 1.0, dtype=np.float32)
-    q = np.clip(np.round(np.clip(f32, -clip_abs, clip_abs) / scale), -127, 127).astype(np.int8, copy=False)
+    scale = np.array(clip_abs / qmax if clip_abs > 0.0 else 1.0, dtype=np.float32)
+    q = np.clip(np.round(np.clip(f32, -clip_abs, clip_abs) / scale), -qmax, qmax).astype(np.int8, copy=False)
     return np.ascontiguousarray(q), scale
 
 
