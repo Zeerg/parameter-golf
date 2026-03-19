@@ -1,0 +1,13 @@
+{
+  "num_layers": 10,
+  "num_physical_layers": 5,
+  "model_dim": 576,
+  "num_kv_heads": 1,
+  "mlp_mult": 2,
+  "matrix_lr": 0.04,
+  "tied_embed_lr": 0.05,
+  "scalar_lr": 0.04,
+  "muon_momentum": 0.95,
+  "warmup_steps": 20,
+  "warmdown_iters": 1200
+}

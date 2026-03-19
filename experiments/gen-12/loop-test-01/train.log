@@ -1,0 +1,82 @@
+Config: {
+  "num_layers": 10,
+  "num_physical_layers": 5,
+  "model_dim": 576,
+  "num_kv_heads": 1,
+  "mlp_mult": 2,
+  "matrix_lr": 0.04,
+  "tied_embed_lr": 0.05,
+  "scalar_lr": 0.04,
+  "muon_momentum": 0.95,
+  "warmup_steps": 20,
+  "warmdown_iters": 1200
+}
+Model params: 10927341
+Skipping warmup (Mac memory constraints)
+step:1/500 train_loss:6.9464 train_time:428ms step_avg:428.18ms
+step:2/500 train_loss:10.8584 train_time:865ms step_avg:432.72ms
+step:3/500 train_loss:8.5981 train_time:1257ms step_avg:418.97ms
+step:4/500 train_loss:7.3284 train_time:1654ms step_avg:413.48ms
+step:5/500 train_loss:6.8457 train_time:2047ms step_avg:409.36ms
+step:6/500 train_loss:6.6032 train_time:2442ms step_avg:406.92ms
+step:7/500 train_loss:6.2868 train_time:2835ms step_avg:404.95ms
+step:8/500 train_loss:6.2603 train_time:3226ms step_avg:403.27ms
+step:9/500 train_loss:6.1930 train_time:3619ms step_avg:402.15ms
+step:10/500 train_loss:6.1584 train_time:4011ms step_avg:401.07ms
+step:20/500 train_loss:5.6486 train_time:7956ms step_avg:397.80ms
+step:30/500 train_loss:5.0768 train_time:11889ms step_avg:396.31ms
+step:40/500 train_loss:4.8991 train_time:15840ms step_avg:396.00ms
+step:50/500 train_loss:4.7582 train_time:19826ms step_avg:396.52ms
+step:60/500 train_loss:4.7440 train_time:23818ms step_avg:396.96ms
+step:70/500 train_loss:4.6033 train_time:27776ms step_avg:396.80ms
+step:80/500 train_loss:4.5408 train_time:31766ms step_avg:397.08ms
+step:90/500 train_loss:4.4944 train_time:35717ms step_avg:396.86ms
+step:100/500 train_loss:4.4965 train_time:39672ms step_avg:396.72ms
+step:110/500 train_loss:4.4418 train_time:43635ms step_avg:396.68ms
+step:120/500 train_loss:4.2464 train_time:47572ms step_avg:396.44ms
+step:130/500 train_loss:4.3066 train_time:51561ms step_avg:396.62ms
+step:140/500 train_loss:4.0905 train_time:55695ms step_avg:397.82ms
+step:150/500 train_loss:4.2818 train_time:59986ms step_avg:399.91ms
+step:160/500 train_loss:4.0619 train_time:64243ms step_avg:401.52ms
+step:170/500 train_loss:4.0797 train_time:68382ms step_avg:402.25ms
+step:180/500 train_loss:4.0914 train_time:72520ms step_avg:402.89ms
+step:190/500 train_loss:3.9333 train_time:76593ms step_avg:403.12ms
+step:200/500 train_loss:3.9887 train_time:80652ms step_avg:403.26ms
+step:210/500 train_loss:3.8332 train_time:84671ms step_avg:403.20ms
+step:220/500 train_loss:3.9734 train_time:88691ms step_avg:403.14ms
+step:230/500 train_loss:3.9985 train_time:92690ms step_avg:403.00ms
+step:240/500 train_loss:3.7277 train_time:96656ms step_avg:402.73ms
+step:250/500 train_loss:3.8269 train_time:100654ms step_avg:402.62ms
+step:260/500 train_loss:3.8330 train_time:104645ms step_avg:402.48ms
+step:270/500 train_loss:3.7192 train_time:108659ms step_avg:402.44ms
+step:280/500 train_loss:3.6976 train_time:112640ms step_avg:402.28ms
+step:290/500 train_loss:3.8610 train_time:116608ms step_avg:402.10ms
+step:300/500 train_loss:3.8273 train_time:120572ms step_avg:401.91ms
+step:310/500 train_loss:3.7016 train_time:124542ms step_avg:401.75ms
+step:320/500 train_loss:3.6933 train_time:128548ms step_avg:401.71ms
+step:330/500 train_loss:3.6367 train_time:132517ms step_avg:401.57ms
+step:340/500 train_loss:3.8360 train_time:136509ms step_avg:401.50ms
+step:350/500 train_loss:3.7568 train_time:140455ms step_avg:401.30ms
+step:360/500 train_loss:3.9000 train_time:144429ms step_avg:401.19ms
+step:370/500 train_loss:3.6449 train_time:148391ms step_avg:401.06ms
+step:380/500 train_loss:3.5023 train_time:152484ms step_avg:401.27ms
+step:390/500 train_loss:3.5258 train_time:156494ms step_avg:401.27ms
+step:400/500 train_loss:3.6467 train_time:160546ms step_avg:401.37ms
+step:410/500 train_loss:3.5658 train_time:164635ms step_avg:401.55ms
+step:420/500 train_loss:3.4950 train_time:168772ms step_avg:401.84ms
+step:430/500 train_loss:3.3528 train_time:173108ms step_avg:402.58ms
+step:440/500 train_loss:3.5228 train_time:177391ms step_avg:403.16ms
+step:450/500 train_loss:3.6977 train_time:181704ms step_avg:403.79ms
+step:460/500 train_loss:3.3933 train_time:186267ms step_avg:404.93ms
+step:470/500 train_loss:3.2805 train_time:190892ms step_avg:406.15ms
+step:480/500 train_loss:3.5494 train_time:195364ms step_avg:407.01ms
+step:490/500 train_loss:3.6247 train_time:199825ms step_avg:407.81ms
+step:500/500 train_loss:3.5348 train_time:204844ms step_avg:409.69ms
+Training done. Total train_time: 204844ms, steps: 500
+Running validation...
+val_loss:3.4776 val_bpb:2.0597
+Quantizing model to int8...
+Artifact saved: experiments/gen-12/loop-test-01/artifact.int8.ptz (6,500,139 bytes, 6.50 MB)
+  int8_payload: 11,373,620 bytes, raw_pickle: 11,378,455 bytes, compressed: 6,500,139 bytes
+Results written to experiments/gen-12/loop-test-01/result.json
+val_bpb: 2.0596550464898455

@@ -149,7 +149,13 @@ Add `rope_base`, `logit_softcap`, `train_seq_len` back into the genome. Run 2000
 `run_experiment.py` — standalone script that reads a config, runs training, and writes results. Does NOT pre-check artifact size, so agents must validate size constraints before invoking it.
 
 ## Experiment Log
-- **gen-6 / f3789760**: layers=11, dim=576, mlp_mult=3, kv_heads=1 → 30.7M params (2x over 16MB limit). val_bpb=2.52 at 100 steps. **Rejected** — way too large. Lesson: the genome ranges allow oversized configs; always estimate params first.
+- **gen-6 / f3789760**: layers=11, dim=576, mlp_mult=3, kv_heads=1 → 30.7M params. **Rejected** — 2x over 16MB limit.
+- **gen-7**: mlp_mult=3, dim=512, 8 layers → ~17.8M params. **Rejected** pre-training.
+- **gen-8**: 8 layers, dim=576, mlp_mult=1, kv_heads=1 → 11.8M params. val_bpb=2.1863 at 500 steps. Artifact 9.5MB.
+- **gen-9**: 9 layers, dim=512, mlp_mult=1, kv_heads=1 → 10.6M params. val_bpb=2.1770 at 500 steps. Artifact 8.0MB.
+- **gen-10**: 11 layers, dim=576, mlp_mult=1, kv_heads=4 → ~18.4M params. **Rejected**.
+- **gen-11**: 8 layers, dim=512, mlp_mult=2, kv_heads=4 → 15.2M params. val_bpb=2.1446 at 500 steps. Artifact 12.1MB.
+- **gen-12 (layer looping)**: 5 phys × 2 loops = 10 effective, dim=576, mlp_mult=2, kv_heads=1 → 13.9M params. **val_bpb=2.0597** at 500 steps. Artifact 6.5MB. Memory ~6GB. **New best** — looping works, wider dims with shared layers beats more unique narrow layers.
 
 ## Baseline Reference
 - Architecture: 9 layers, dim 512, 8 heads, 4 KV heads, mlp_mult 2
@@ -177,3 +183,10 @@ Reuse the same physical block weights multiple times to get more effective depth
 - A per-loop learnable scale (`loop_scales`) lets the model differentiate loop passes (tiny: `num_loop_passes * dim` params)
 - Skip connections operate over the effective layer count as before
 - `num_layers % num_physical_layers` must equal 0
+- **Keep loop ratio ≤ 2x** — 3x+ looping degrades quality (blocks bottlenecked serving too many roles)
+- **Use freed param budget for wider dims, don't just shrink the model** — the win is redistribution
+
+### Proven looping configs (gen-12 validated)
+- 5 phys × 2 loops × dim 576 × mlp_mult 2 = 13.9M params, 6.5MB artifact, val_bpb=2.0597, ~6GB memory
+- Memory is very comfortable with looping (~6GB vs ~12GB+ for equivalent non-looped configs)
+- dim=576 requires `num_heads=9` (576/64), so `num_kv_heads` must divide 9 (use 1, 3, or 9)
