@@ -38,6 +38,7 @@ Map config keys to env vars (all uppercase):
 - `logit_softcap` → `LOGIT_SOFTCAP`
 - `num_physical_layers` → `NUM_PHYSICAL_LAYERS` (0 = same as num_layers, no looping)
 - `quant_bits` → `QUANT_BITS` (default 8; use 7 for ~1.3MB smaller artifact at only +0.01 BPB cost)
+- `mlp_type` → `MLP_TYPE` ("standard" or "hourglass"). Hourglass uses K=2 stacked wide-narrow-wide sub-MLPs with residuals. 36.5% fewer params than standard MLP — reinvest in wider dims.
 
 Always set (fixed, not genome parameters):
 - `DATA_PATH=/Users/tbowyer/parameter-golf/data/datasets/fineweb10B_sp1024`

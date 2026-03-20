@@ -77,6 +77,7 @@ class Hyperparameters:
     rope_base: float = float(os.environ.get("ROPE_BASE", 10000.0))
     qk_gain_init: float = float(os.environ.get("QK_GAIN_INIT", 1.5))
     num_physical_layers: int = int(os.environ.get("NUM_PHYSICAL_LAYERS", 0))  # 0 = same as num_layers (no looping)
+    mlp_type: str = os.environ.get("MLP_TYPE", "standard")  # "standard" or "hourglass"
 
     # Optimizer. We keep the same per-group defaults as train_gpt.py.
     beta1: float = float(os.environ.get("BETA1", 0.9))
@@ -348,6 +349,24 @@ class MLP(nn.Module):
         return self.proj(x * x)
 
 
+class HourglassMLP(nn.Module):
+    # Wide-narrow-wide MLP: K stacked sub-MLPs with residual connections.
+    # Each sub-MLP: dim -> bottleneck -> dim with relu^2.
+    # More expressive per-parameter than conventional narrow-wide-narrow MLP.
+    # Reference: arxiv 2602.06471
+    def __init__(self, dim: int, mlp_mult: int, num_sub_mlps: int = 2):
+        super().__init__()
+        bottleneck = max(int(dim * 0.4), 1)
+        self.sub_fc = [CastedLinear(dim, bottleneck) for _ in range(num_sub_mlps)]
+        self.sub_proj = [CastedLinear(bottleneck, dim) for _ in range(num_sub_mlps)]
+
+    def __call__(self, x: mx.array) -> mx.array:
+        for fc, proj in zip(self.sub_fc, self.sub_proj):
+            h = nn.relu(fc(x))
+            x = x + proj(h * h)
+        return x
+
+
 class Block(nn.Module):
     def __init__(
         self,
@@ -357,12 +376,13 @@ class Block(nn.Module):
         mlp_mult: int,
         rope_base: float,
         qk_gain_init: float,
+        mlp_type: str = "standard",
     ):
         super().__init__()
         self.attn_norm = RMSNormNoWeight()
         self.mlp_norm = RMSNormNoWeight()
         self.attn = CausalSelfAttention(dim, num_heads, num_kv_heads, rope_base, qk_gain_init)
-        self.mlp = MLP(dim, mlp_mult)
+        self.mlp = HourglassMLP(dim, mlp_mult) if mlp_type == "hourglass" else MLP(dim, mlp_mult)
         self.attn_scale = mx.ones((dim,), dtype=mx.float32)
         self.mlp_scale = mx.ones((dim,), dtype=mx.float32)
         self.resid_mix = mx.array(np.stack((np.ones((dim,), dtype=np.float32), np.zeros((dim,), dtype=np.float32))))
@@ -383,7 +403,7 @@ class GPT(nn.Module):
     # - tied embeddings for the LM head (the baseline default setup)
     def __init__(self, vocab_size: int, num_layers: int, dim: int, num_heads: int, num_kv_heads: int, mlp_mult: int,
                  logit_chunk_tokens: int, logit_softcap: float, rope_base: float, tied_embed_init_std: float,
-                 qk_gain_init: float, num_physical_layers: int = 0):
+                 qk_gain_init: float, num_physical_layers: int = 0, mlp_type: str = "standard"):
         super().__init__()
         if logit_softcap <= 0.0:
             raise ValueError(f"logit_softcap must be positive, got {logit_softcap}")
@@ -402,7 +422,7 @@ class GPT(nn.Module):
         self.num_skip_weights = min(self.num_encoder_layers, self.num_decoder_layers)
         self.skip_weights = mx.ones((self.num_skip_weights, dim), dtype=mx.float32)
         self.blocks = [
-            Block(dim, num_heads, num_kv_heads, mlp_mult, rope_base, qk_gain_init)
+            Block(dim, num_heads, num_kv_heads, mlp_mult, rope_base, qk_gain_init, mlp_type)
             for _ in range(self.num_physical_layers)
         ]
         # Per-loop-pass learnable scale so the model can differentiate iterations
@@ -412,7 +432,11 @@ class GPT(nn.Module):
 
         for b in self.blocks:
             b.attn.proj.weight = mx.zeros_like(b.attn.proj.weight)
-            b.mlp.proj.weight = mx.zeros_like(b.mlp.proj.weight)
+            if hasattr(b.mlp, 'proj'):
+                b.mlp.proj.weight = mx.zeros_like(b.mlp.proj.weight)
+            elif hasattr(b.mlp, 'sub_proj'):
+                for sp in b.mlp.sub_proj:
+                    sp.weight = mx.zeros_like(sp.weight)
         self.tok_emb.weight = (
             mx.random.normal(self.tok_emb.weight.shape, dtype=mx.float32) * tied_embed_init_std
         ).astype(COMPUTE_DTYPE)
@@ -904,6 +928,7 @@ def main() -> None:
         tied_embed_init_std=args.tied_embed_init_std,
         qk_gain_init=args.qk_gain_init,
         num_physical_layers=args.num_physical_layers,
+        mlp_type=args.mlp_type,
     )
     opt = SplitOptimizers(model, args)
 
