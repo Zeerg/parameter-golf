@@ -6,6 +6,7 @@ import math
 import os
 import pickle
 import platform
+import subprocess
 import sys
 import time
 import zlib
@@ -131,14 +132,16 @@ def main():
     with open(config_path) as f:
         config = json.load(f)
 
-    # Log script source and system info
-    script_path = os.path.abspath(__file__)
-    print(Path(script_path).read_text(encoding="utf-8"))
+    # Log both the runner and the training script source
+    runner_path = os.path.abspath(__file__)
+    train_script_path = os.path.join(os.path.dirname(runner_path), "train_gpt_mlx.py")
+    print(Path(train_script_path).read_text(encoding="utf-8"))
+    print("=" * 100)
+    print(Path(runner_path).read_text(encoding="utf-8"))
     print("=" * 100)
     print(f"Running Python {sys.version}")
     print(f"Platform: {platform.platform()}")
     print(f"MLX version: {mx.__version__}")
-    import subprocess
     sysctl = subprocess.run(["sysctl", "-n", "hw.memsize", "machdep.cpu.brand_string"],
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
     print(f"System: {sysctl.stdout.strip()}")
