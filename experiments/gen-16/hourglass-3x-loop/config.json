@@ -1,0 +1,15 @@
+{
+  "num_layers": 18,
+  "num_physical_layers": 6,
+  "model_dim": 576,
+  "num_kv_heads": 1,
+  "mlp_mult": 2,
+  "mlp_type": "hourglass",
+  "matrix_lr": 0.04,
+  "tied_embed_lr": 0.05,
+  "scalar_lr": 0.04,
+  "muon_momentum": 0.95,
+  "warmup_steps": 20,
+  "warmdown_iters": 1200,
+  "quant_bits": 7
+}

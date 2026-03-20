@@ -172,7 +172,7 @@ Add `rope_base`, `logit_softcap`, `train_seq_len` back into the genome. Run 2000
 - **gen-13 (5k convergence)**: same as gen-12, 5000 steps. val_bpb=1.6300. Still dropping.
 - **gen-14 (20k convergence)**: same config, 20000 steps. **val_bpb=1.4995**. 3.6 hours on Mac. Still dropping at completion.
 - **gen-15 (wider dim=640)**: 6 phys × 2 loops = 12 effective, dim=640, 20.3M params. val_bpb=1.6807 at 5000 steps. Worse than gen-13 at same step count — bigger model needs more steps to converge with tiny Mac batches.
-- **gen-16 (hourglass + 3x loop)**: 6 phys × 3 loops = 18 effective, dim=576, hourglass MLP, 8.2M unique / 23.4M effective params. **Running**.
+- **gen-16 (hourglass + 3x loop)**: 6 phys × 3 loops = 18 effective, dim=576, hourglass MLP, 8.2M unique / 23.4M effective params. **FAILED** — model collapsed to random guessing at step ~1500. 3x looping + hourglass bottleneck too aggressive.
 
 ## Baseline Reference
 - Architecture: 9 layers, dim 512, 8 heads, 4 KV heads, mlp_mult 2

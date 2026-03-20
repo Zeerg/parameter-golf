@@ -1,0 +1,7 @@
+{
+  "val_bpb": null,
+  "iterations_completed": 2220,
+  "failed": true,
+  "failure_reason": "Model collapsed to random guessing (loss=6.9315=ln(1024)). 3x looping with hourglass bottleneck (40% of dim) is too aggressive — blocks too thin to serve 3 different roles in the loop. Gradients likely vanishing through 18 effective layers.",
+  "notes": "Hourglass MLP works in isolation (36.5% param savings) but combining with 3x looping kills training. Next: try 2x looping + hourglass instead."
+}
