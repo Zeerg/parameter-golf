@@ -203,3 +203,24 @@ Configurable via `QUANT_BITS` env var (default 8). Measured BPB cost on gen-13 (
 | int6 | 1.6852 | +0.052 | 7.9MB | 2.6MB |
 
 **Recommendation**: Use `QUANT_BITS=7` for submissions near the 16MB limit. The 0.01 BPB cost is recovered by fitting ~1.3M more params. int6 is steeper but may be worth it for very large models.
+
+## What's Next
+
+### Immediate: 3x looping + hourglass + wider dim
+Target: 8 physical layers × 3 loops = 24 effective, dim=768, hourglass MLP, int7.
+- 18.6M unique params, ~54M effective, ~14.1MB artifact
+- This would be a 4x increase in effective depth over gen-14
+- Risk: 3x looping may degrade — but hourglass MLP (lighter blocks) + loop_scales should help
+- A/B test against proven 2x config at same step count
+
+### Next: features from top submissions
+The best submissions use tricks we haven't implemented yet:
+- **zstd compression** (level 22) — better ratios than zlib, already in `train_gpt.py`
+- **Quantization-aware training (QAT)** — straight-through estimator during training so model learns to be robust to quantization
+- **Stochastic Weight Averaging (SWA)** — average checkpoints from second half of training, nearly free BPB
+- **Curriculum learning** — start with shorter sequences, ramp to full seq_len
+- **Low-bit quantization with SVD residual correction** — int4 per-tensor with low-rank error correction
+- **Group quantization** — finer-grained scales within rows for better int8 quality
+
+### Future: agent memory compression
+The trained model can serve as a lossless text compressor via arithmetic coding (~1.2 BPB = 85% compression). At 6.5MB model size, it could run in-process with an agent to compress/decompress memories — smaller than existing solutions that require 7B+ models.
