@@ -15,10 +15,13 @@ OpenAI Parameter Golf challenge: train the best language model in a 16MB artifac
 
 **Key learnings**:
 - Layer looping (2x) works great — same quality, half the artifact size
-- dim=576 converges faster than dim=640 on Mac tiny batches
+- 3x looping collapses, especially with hourglass MLP (gen-16). Stick to 2x max
+- dim=576 converges faster than dim=640 on Mac tiny batches (gen-15 vs gen-13)
 - int7 quantization costs only +0.01 BPB, saves 1.3MB artifact space
-- Hourglass MLP saves 36.5% of MLP params — testing in gen-16
+- Hourglass MLP saves 36.5% of MLP params but collapsed when combined with 3x looping
+- 32K batch is no better than 8K on Mac — more update steps beats cleaner gradients (gen-17)
 - More steps always helps — no plateau observed at 20k steps
+- Best config for Mac: 5 phys × 2 loops, dim=576, standard MLP, 8K batch
 
 ## Running an Experiment
 
@@ -173,6 +176,7 @@ Add `rope_base`, `logit_softcap`, `train_seq_len` back into the genome. Run 2000
 - **gen-14 (20k convergence)**: same config, 20000 steps. **val_bpb=1.4995**. 3.6 hours on Mac. Still dropping at completion.
 - **gen-15 (wider dim=640)**: 6 phys × 2 loops = 12 effective, dim=640, 20.3M params. val_bpb=1.6807 at 5000 steps. Worse than gen-13 at same step count — bigger model needs more steps to converge with tiny Mac batches.
 - **gen-16 (hourglass + 3x loop)**: 6 phys × 3 loops = 18 effective, dim=576, hourglass MLP, 8.2M unique / 23.4M effective params. **FAILED** — model collapsed to random guessing at step ~1500. 3x looping + hourglass bottleneck too aggressive.
+- **gen-17 (32K batch)**: same as gen-14 config but 32K batch (4x larger). val_bpb=1.6425 at 1000 steps (34 min). Similar to 8K batch at equivalent wall time — bigger batches don't help on Mac, stick with 8K.
 
 ## Baseline Reference
 - Architecture: 9 layers, dim 512, 8 heads, 4 KV heads, mlp_mult 2
@@ -221,14 +225,19 @@ Configurable via `QUANT_BITS` env var (default 8). Measured BPB cost on gen-13 (
 
 ## What's Next
 
-### Immediate: 3x looping + hourglass + wider dim
-Target: 8 physical layers × 3 loops = 24 effective, dim=768, hourglass MLP, int7.
-- 18.6M unique params, ~54M effective, ~14.1MB artifact
-- This would be a 4x increase in effective depth over gen-14
-- Risk: 3x looping may degrade — but hourglass MLP (lighter blocks) + loop_scales should help
-- A/B test against proven 2x config at same step count
+### Immediate: LR sweep + tune for overnight run
+- Sweep matrix_lr (0.06, 0.08) — current 0.04 was tuned for H100s, Mac tiny batches may benefit from higher LRs
+- Tune warmdown_iters for 100k steps (current 1200 is for 20k)
+- Try 2x loop + hourglass at dim=576 (gen-16 failed because of 3x, not hourglass itself)
+- Once best config found, run 100k steps overnight to push toward baseline 1.2244
 
-### Next: features from top submissions
+### Failed approaches (don't retry)
+- 3x looping: collapsed to random guessing (gen-16)
+- 3x looping + hourglass: even worse, model died at step ~1500
+- 32K batch on Mac: no benefit over 8K, just slower per step (gen-17)
+- dim=640 at 5k steps: needs too many steps to converge on Mac (gen-15)
+
+### Features from top submissions to implement
 The best submissions use tricks we haven't implemented yet:
 - **zstd compression** (level 22) — better ratios than zlib, already in `train_gpt.py`
 - **Quantization-aware training (QAT)** — straight-through estimator during training so model learns to be robust to quantization
