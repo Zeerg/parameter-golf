@@ -5,6 +5,7 @@ import json
 import math
 import os
 import pickle
+import platform
 import sys
 import time
 import zlib
@@ -130,10 +131,36 @@ def main():
     with open(config_path) as f:
         config = json.load(f)
 
+    # Log script source and system info
+    script_path = os.path.abspath(__file__)
+    print(Path(script_path).read_text(encoding="utf-8"))
+    print("=" * 100)
+    print(f"Running Python {sys.version}")
+    print(f"Platform: {platform.platform()}")
+    print(f"MLX version: {mx.__version__}")
+    import subprocess
+    sysctl = subprocess.run(["sysctl", "-n", "hw.memsize", "machdep.cpu.brand_string"],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+    print(f"System: {sysctl.stdout.strip()}")
+    print("=" * 100)
+
     print(f"Config: {json.dumps(config, indent=2)}")
 
     args = Hyperparameters()
     mx.random.seed(args.seed)
+
+    # Log all hyperparameters
+    print(f"data_path:{args.data_path}")
+    print(f"tokenizer_path:{args.tokenizer_path}")
+    print(f"model: num_layers={args.num_layers} model_dim={args.model_dim} num_heads={args.num_heads} "
+          f"num_kv_heads={args.num_kv_heads} mlp_mult={args.mlp_mult} mlp_type={args.mlp_type}")
+    print(f"layer_looping: num_physical_layers={args.num_physical_layers}")
+    print(f"optimizer: matrix_lr={args.matrix_lr} scalar_lr={args.scalar_lr} tied_embed_lr={args.tied_embed_lr} "
+          f"muon_momentum={args.muon_momentum} warmup_steps={args.warmup_steps} warmdown_iters={args.warmdown_iters}")
+    print(f"training: iterations={args.iterations} train_batch_tokens={args.train_batch_tokens} "
+          f"train_seq_len={args.train_seq_len} seed={args.seed}")
+    print(f"quantization: QUANT_BITS={os.environ.get('QUANT_BITS', '8')}")
+    print("=" * 100)
 
     # Setup tokenizer
     sp = spm.SentencePieceProcessor(model_file=args.tokenizer_path)
