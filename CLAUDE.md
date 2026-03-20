@@ -166,7 +166,7 @@ Add `rope_base`, `logit_softcap`, `train_seq_len` back into the genome. Run 2000
 - Result: val_bpb=1.2244 (10 min on 8xH100), 15,863,489 bytes artifact
 
 ## Important Constraints
-- The final artifact (code + int8-quantized weights + zlib) must fit in 16MB (16,000,000 bytes)
+- The final artifact (code + int8-quantized weights + zlib) must fit in 16,000,000 bytes (decimal 16MB, NOT 16 MiB / 16,777,216)
 - `num_heads` must evenly divide `model_dim`
 - `num_kv_heads` must evenly divide `num_heads`
 - Larger `model_dim` x `num_layers` = more parameters = risk exceeding 16MB
