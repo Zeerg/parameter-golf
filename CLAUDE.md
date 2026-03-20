@@ -7,7 +7,18 @@
 ## What This Is
 OpenAI Parameter Golf challenge: train the best language model in a 16MB artifact, measured by bits per byte (BPB) on FineWeb validation set. Lower BPB = better.
 
-**Strategy**: Use the 36GB Mac Pro for fast local iteration — tune architecture and hyperparameters with short MLX runs. Once we find winning configs, port to 8xH100 for the scored 10-min track submission. The algorithm/architecture is what we're optimizing — not MLX-specific tricks.
+**Goal**: Hit or beat baseline val_bpb=1.2244 on a single Mac M3 Max (36GB). Use longer training runs + novel architecture (layer looping, hourglass MLP) to compensate for tiny batch sizes vs 8xH100.
+
+**Strategy**: Iterate architecture locally with 500-5000 step runs, then run best configs for 20k-100k steps overnight. Port winners to `train_gpt.py` for H100 submission.
+
+**Current best**: gen-14, val_bpb=1.4995 at 20k steps (5 phys × 2 loops, dim=576). Gap to baseline: 0.275 BPB.
+
+**Key learnings**:
+- Layer looping (2x) works great — same quality, half the artifact size
+- dim=576 converges faster than dim=640 on Mac tiny batches
+- int7 quantization costs only +0.01 BPB, saves 1.3MB artifact space
+- Hourglass MLP saves 36.5% of MLP params — testing in gen-16
+- More steps always helps — no plateau observed at 20k steps
 
 ## Running an Experiment
 
@@ -157,7 +168,11 @@ Add `rope_base`, `logit_softcap`, `train_seq_len` back into the genome. Run 2000
 - **gen-9**: 9 layers, dim=512, mlp_mult=1, kv_heads=1 → 10.6M params. val_bpb=2.1770 at 500 steps. Artifact 8.0MB.
 - **gen-10**: 11 layers, dim=576, mlp_mult=1, kv_heads=4 → ~18.4M params. **Rejected**.
 - **gen-11**: 8 layers, dim=512, mlp_mult=2, kv_heads=4 → 15.2M params. val_bpb=2.1446 at 500 steps. Artifact 12.1MB.
-- **gen-12 (layer looping)**: 5 phys × 2 loops = 10 effective, dim=576, mlp_mult=2, kv_heads=1 → 13.9M params. **val_bpb=2.0597** at 500 steps. Artifact 6.5MB. Memory ~6GB. **New best** — looping works, wider dims with shared layers beats more unique narrow layers.
+- **gen-12 (layer looping)**: 5 phys × 2 loops = 10 effective, dim=576, mlp_mult=2, kv_heads=1 → 13.9M params. val_bpb=2.0597 at 500 steps. Artifact 6.5MB. Memory ~6GB. Looping works.
+- **gen-13 (5k convergence)**: same as gen-12, 5000 steps. val_bpb=1.6300. Still dropping.
+- **gen-14 (20k convergence)**: same config, 20000 steps. **val_bpb=1.4995**. 3.6 hours on Mac. Still dropping at completion.
+- **gen-15 (wider dim=640)**: 6 phys × 2 loops = 12 effective, dim=640, 20.3M params. val_bpb=1.6807 at 5000 steps. Worse than gen-13 at same step count — bigger model needs more steps to converge with tiny Mac batches.
+- **gen-16 (hourglass + 3x loop)**: 6 phys × 3 loops = 18 effective, dim=576, hourglass MLP, 8.2M unique / 23.4M effective params. **Running**.
 
 ## Baseline Reference
 - Architecture: 9 layers, dim 512, 8 heads, 4 KV heads, mlp_mult 2
